@@ -1,0 +1,185 @@
+#include <WiFi.h>
+#include <WebServer.h>
+#include <ESP32Servo.h>
+
+WebServer server(80);
+Servo radarServo;
+
+#define IN1 25
+#define IN2 26
+#define IN3 27
+#define IN4 14
+
+#define IN5 32
+#define IN6 33
+#define IN7 18
+#define IN8 19
+
+#define RELAY_PIN 23
+
+#define SERVO_PIN 13
+#define TRIG_PIN 4
+#define ECHO_PIN 5
+
+const char* ssid = "Nothing3A";
+const char* password = "Rajan1234";
+
+bool radarOn = false;
+int angle = 0;
+int stepAngle = 2;
+
+String page = R"====(
+<!DOCTYPE html>
+<html>
+<head>
+<meta name='viewport' content='width=device-width, initial-scale=1'>
+<style>
+body{background:#111;color:white;text-align:center;font-family:Arial;}
+button{
+width:120px;height:60px;font-size:20px;
+margin:8px;border:none;border-radius:12px;
+}
+.green{background:green;color:white;}
+.red{background:red;color:white;}
+.blue{background:#007bff;color:white;}
+.orange{background:orange;color:white;}
+</style>
+</head>
+<body>
+
+<h2>ROVER CONTROL</h2>
+
+<button class='green' onclick="location.href='/F'">FORWARD</button><br>
+
+<button class='blue' onclick="location.href='/L'">LEFT</button>
+<button class='red' onclick="location.href='/S'">STOP</button>
+<button class='blue' onclick="location.href='/R'">RIGHT</button><br>
+
+<button class='orange' onclick="location.href='/B'">BACK</button><br><br>
+
+<button class='green' onclick="location.href='/FOGON'">FOG ON</button>
+<button class='red' onclick="location.href='/FOGOFF'">FOG OFF</button><br><br>
+
+<button class='green' onclick="location.href='/RADARON'">RADAR ON</button>
+<button class='red' onclick="location.href='/RADAROFF'">RADAR OFF</button>
+
+</body>
+</html>
+)====";
+
+void setup() {
+
+  Serial.begin(115200);
+
+  pinMode(IN1, OUTPUT); pinMode(IN2, OUTPUT);
+  pinMode(IN3, OUTPUT); pinMode(IN4, OUTPUT);
+
+  pinMode(IN5, OUTPUT); pinMode(IN6, OUTPUT);
+  pinMode(IN7, OUTPUT); pinMode(IN8, OUTPUT);
+
+  stopMotors();
+
+  pinMode(RELAY_PIN, OUTPUT);
+  digitalWrite(RELAY_PIN, HIGH);   // OFF
+
+  pinMode(TRIG_PIN, OUTPUT);
+  pinMode(ECHO_PIN, INPUT);
+
+  radarServo.attach(SERVO_PIN);
+  radarServo.write(90);
+
+  WiFi.softAP(ssid, password);
+
+  Serial.println("WiFi Started");
+  Serial.print("IP Address: ");
+  Serial.println(WiFi.softAPIP());
+
+  server.on("/", [](){ server.send(200,"text/html",page); });
+
+  server.on("/F", [](){ forward(); server.send(200,"text/html",page); });
+  server.on("/B", [](){ backward(); server.send(200,"text/html",page); });
+  server.on("/L", [](){ left(); server.send(200,"text/html",page); });
+  server.on("/R", [](){ right(); server.send(200,"text/html",page); });
+  server.on("/S", [](){ stopMotors(); server.send(200,"text/html",page); });
+
+  server.on("/FOGON", [](){ digitalWrite(RELAY_PIN, LOW); server.send(200,"text/html",page); });
+  server.on("/FOGOFF", [](){ digitalWrite(RELAY_PIN, HIGH); server.send(200,"text/html",page); });
+
+  server.on("/RADARON", [](){ radarOn = true; server.send(200,"text/html",page); });
+  server.on("/RADAROFF", [](){ radarOn = false; server.send(200,"text/html",page); });
+
+  server.begin();
+}
+
+void loop() {
+
+  server.handleClient();
+
+  if(radarOn){
+    radarServo.write(angle);
+    delay(20);
+
+    int distance = getDistance();
+
+    Serial.print("Angle: ");
+    Serial.print(angle);
+    Serial.print("  Distance: ");
+    Serial.println(distance);
+
+    angle += stepAngle;
+
+    if(angle >= 180 || angle <= 0){
+      stepAngle = -stepAngle;
+    }
+  }
+}
+
+int getDistance() {
+
+  digitalWrite(TRIG_PIN, LOW);
+  delayMicroseconds(2);
+
+  digitalWrite(TRIG_PIN, HIGH);
+  delayMicroseconds(10);
+
+  digitalWrite(TRIG_PIN, LOW);
+
+  long duration = pulseIn(ECHO_PIN, HIGH);
+
+  return duration * 0.034 / 2;
+}
+
+void forward() {
+  digitalWrite(IN1,HIGH); digitalWrite(IN2,LOW);
+  digitalWrite(IN3,HIGH); digitalWrite(IN4,LOW);
+  digitalWrite(IN5,HIGH); digitalWrite(IN6,LOW);
+  digitalWrite(IN7,HIGH); digitalWrite(IN8,LOW);
+}
+
+void backward() {
+  digitalWrite(IN1,LOW); digitalWrite(IN2,HIGH);
+  digitalWrite(IN3,LOW); digitalWrite(IN4,HIGH);
+  digitalWrite(IN5,LOW); digitalWrite(IN6,HIGH);
+  digitalWrite(IN7,LOW); digitalWrite(IN8,HIGH);
+}
+
+void left() {
+  digitalWrite(IN1,LOW); digitalWrite(IN2,HIGH);
+  digitalWrite(IN3,LOW); digitalWrite(IN4,HIGH);
+  digitalWrite(IN5,HIGH); digitalWrite(IN6,LOW);
+  digitalWrite(IN7,HIGH); digitalWrite(IN8,LOW);
+}
+
+void right() {
+  digitalWrite(IN1,HIGH); digitalWrite(IN2,LOW);
+  digitalWrite(IN3,HIGH); digitalWrite(IN4,LOW);
+  digitalWrite(IN5,LOW); digitalWrite(IN6,HIGH);
+  digitalWrite(IN7,LOW); digitalWrite(IN8,HIGH);
+}
+
+void stopMotors() {
+  digitalWrite(IN1,LOW); digitalWrite(IN2,LOW);
+  digitalWrite(IN3,LOW); digitalWrite(IN4,LOW);
+  digitalWrite(IN5,LOW); digitalWrite(IN6,LOW);
+  digitalWrite(IN7,LOW); digitalWrite(IN8,LOW);
+}
