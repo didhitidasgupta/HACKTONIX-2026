@@ -1,0 +1,123 @@
+import processing.serial.*;
+
+Serial myPort;
+
+int angle = 0;
+int distance = 0;
+String data;
+
+void setup() {
+  size(1000, 700);
+  smooth();
+
+  printArray(Serial.list());
+
+  myPort = new Serial(this, "COM6", 115200);
+  myPort.bufferUntil('\n');
+}
+
+void draw() {
+  background(5, 10, 5);
+
+  drawGrid();
+  drawSweep();
+  drawTarget();
+  drawInfo();
+}
+
+// ===== SERIAL =====
+void serialEvent(Serial myPort) {
+
+  data = myPort.readStringUntil('\n');
+
+  if (data != null) {
+    data = trim(data);
+
+    String values[] = split(data, ',');
+
+    if (values.length == 2) {
+      angle = int(values[0]);
+      distance = int(values[1]);
+    }
+  }
+}
+
+
+void drawGrid() {
+
+  pushMatrix();
+  translate(width/2, height-40);
+
+  stroke(0,255,120);
+  noFill();
+  strokeWeight(2);
+
+  for (int r=150; r<=500; r+=90) {
+    arc(0,0,r*2,r*2,PI,TWO_PI);
+  }
+
+  for (int a=-90; a<=90; a+=30) {
+    line(0,0,
+    500*cos(radians(a)),
+    500*sin(radians(a)));
+  }
+
+  line(-500,0,500,0);
+
+  popMatrix();
+}
+void drawSweep() {
+
+  pushMatrix();
+  translate(width/2, height-40);
+
+  for (int i=0; i<20; i++) {
+
+    stroke(0,255,0, 10*i);
+    strokeWeight(3);
+
+    float a = radians((angle-i)-90);
+
+    line(0,0,
+    500*cos(a),
+    500*sin(a));
+  }
+
+  popMatrix();
+}
+
+void drawTarget() {
+
+  if (distance > 0 && distance < 80) {
+
+    pushMatrix();
+    translate(width/2, height-40);
+
+    float r = distance * 6;
+
+    fill(255, 0, 0);
+    noStroke();
+
+    ellipse(
+      r*cos(radians(angle-90)),
+      r*sin(radians(angle-90)),
+      16,16
+    );
+
+    popMatrix();
+  }
+}
+
+void drawInfo() {
+
+  fill(0,255,100);
+  textSize(30);
+  text("SMART RADAR", 30,40);
+
+  textSize(22);
+  text("ANGLE : " + angle + "°", 30,80);
+  text("DISTANCE : " + distance + " cm", 30,115);
+
+  fill(255,0,0);
+  text("TARGET", 30,150);
+}
